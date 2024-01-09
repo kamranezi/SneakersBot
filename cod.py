@@ -4,63 +4,57 @@
 # from firebase_admin import credentials, db
 #
 # # Путь к вашему файлу JSON с учетными данными Firebase
-# cred = credentials.Certificate('home-b114b-firebase-adminsdk-hp712-dc89fd3e8e.json')
+# cred = credentials.Certificate('sneakers-5c581-firebase-adminsdk-y2ktp-9b9880fab5.json')
 #
 # # Инициализация Firebase Admin SDK
 # firebase_admin.initialize_app(cred, {
-#     'databaseURL': 'https://home-b114b-default-rtdb.europe-west1.firebasedatabase.app/'
+#     'databaseURL': 'https://sneakers-5c581-default-rtdb.europe-west1.firebasedatabase.app/'
 # })
 #
-# # Получение ссылки на базу данных
-# ref = db.reference()
+# # Получение ссылки на базу данных, особенно на узел 'items'
+# ref = db.reference('items')
 #
 # # Создаем словарь для хранения временных данных пользователей
 # user_data = {}
 #
 # bot = telebot.TeleBot('6662518155:AAHlwCxFLsS-uXWmEq3XByDj9nRSFF40Wdg')
+# def show_start_menu(chat_id):
+#     markup = types.InlineKeyboardMarkup()
+#     category_button = types.InlineKeyboardButton("👟 Категории", callback_data='category')
+#     fav_button = types.InlineKeyboardButton("❤️ Открыть избранное",
+#                                              web_app=types.WebAppInfo(url="https://sneakers-5c581.firebaseapp.com/favorites"))
+#     menu_button = types.InlineKeyboardButton("📖 Открыть встроенный магазин  ", web_app=types.WebAppInfo(
+#         url="https://sneakers-5c581.firebaseapp.com"))
+#     markup.add(category_button)
+#     markup.add(fav_button)
+#     markup.add(menu_button)
+#
+#     bot.send_message(chat_id, "Выберите опцию:", reply_markup=markup)
 #
 # @bot.message_handler(commands=['start'])
 # def start(message):
 #     # Сбросим временные данные пользователя при каждом запуске команды /start
 #     user_data[message.chat.id] = {}
-#     show_main_menu(message)
 #
-# def show_main_menu(message):
-#     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     btn1 = types.KeyboardButton('Перейти в корзину')
-#     markup.row(btn1)
-#     # Добавляем кнопку "Выбрать кроссовки" внизу
-#     choose_shoes_button = types.KeyboardButton('Выбрать кроссовки')
-#     markup.add(choose_shoes_button)
+#     # Отправляем фото
+#     photo_url = 'https://shopozz.ru/images/articles/article-1090/p1gt8ijduds7qdu615tql0ig8l3.jpg'
+#     bot.send_photo(message.chat.id, photo_url, caption="Добро пожаловать в мир оригинальных кроссовок!")
 #
-#     bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name}', reply_markup=markup)
-#     bot.register_next_step_handler(message, on_click)
+#     # Отображаем стартовое меню
+#     show_start_menu(message.chat.id)
 #
-# def on_click(message):
-#     if message.text == 'Перейти в корзину':
-#         bot.send_message(message.chat.id, 'Website is open')
-#         show_main_menu(message)
-#     elif message.text == 'Выбрать кроссовки':
-#         show_shoes_menu(message)
-#
-# def show_shoes_menu(message):
-#     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     btn1 = types.KeyboardButton('В наличии')
-#     btn2 = types.KeyboardButton('На заказ')
-#     markup.row(btn1, btn2)
-#
-#     bot.send_message(message.chat.id, 'Выберите категорию товаров:', reply_markup=markup)
-#     bot.register_next_step_handler(message, handle_shoes_menu)
-#
-# def handle_shoes_menu(message):
-#     if message.text == 'В наличии':
-#         user_data[message.chat.id]['selected_availability'] = True
-#         show_catalog_inline(message)
-#     elif message.text == 'На заказ':
-#         show_available_categories_inline(message)
-#     else:
-#         show_main_menu(message)
-#
+# @bot.callback_query_handler(func=lambda call: call.data == 'category')
+# def handle_category(call):
+#     show_available_categories_inline(call.message)
+# # @bot.message_handler(content_types=['text'])
+# # def handle_text(message):
+# #     if message.text == "Написать нам":
+# #         bot.send_message(message.chat.id, "Написать нам: @kamranezi")
+# #     elif message.text == "Позвоните нам":
+# #         bot.send_message(message.chat.id, "Позвоните нам: +79183083345")
+# # @bot.callback_query_handler(func=lambda call: call.data.startswith('category_'))
+# # def handle_category_selection(call):
+# #     category = call.data.split('_')[1]
 # def show_available_categories_inline(message):
 #     # Получите уникальные категории из базы данных Firebase
 #     categories_set = set()
@@ -151,8 +145,9 @@
 #         send_full_product_info(call.message.chat.id, index)
 #
 #         # Создаем клавиатуру для выбора размера
+#         back_button = types.KeyboardButton("Начать сначала")
 #         size_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#
+#         size_keyboard.add(back_button)
 #         # Разбиваем размеры на пары и добавляем кнопки
 #         sizes = details.get('sizes', {})
 #         for us_size, eu_size in zip(sizes.get('US', []), sizes.get('EU', [])):
@@ -174,13 +169,16 @@
 #         bot.send_message(chat_id, full_info_text)
 #
 # def choose_payment_method(message):
-#     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     btn2 = types.KeyboardButton('Наличные')
-#     btn3 = types.KeyboardButton('Wallet Pay')
-#     markup.row(btn2, btn3)
+#     if message.text == 'Начать сначала':
+#         show_start_menu(message.chat.id)  # Отображение стартового меню
+#     else:
+#         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#         btn2 = types.KeyboardButton('Наличные')
+#         btn3 = types.KeyboardButton('Wallet Pay')
+#         markup.row(btn2, btn3)
 #
-#     bot.send_message(message.chat.id, 'Выберите способ оплаты:', reply_markup=markup)
-#     bot.register_next_step_handler(message, choose_delivery_method)
+#         bot.send_message(message.chat.id, 'Выберите способ оплаты:', reply_markup=markup)
+#         bot.register_next_step_handler(message, choose_delivery_method)
 #
 # def choose_delivery_method(message):
 #     if message.text == 'Наличные':

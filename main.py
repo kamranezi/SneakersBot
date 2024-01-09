@@ -18,6 +18,18 @@ ref = db.reference('items')
 user_data = {}
 
 bot = telebot.TeleBot('6662518155:AAHlwCxFLsS-uXWmEq3XByDj9nRSFF40Wdg')
+def show_start_menu(chat_id):
+    markup = types.InlineKeyboardMarkup()
+    category_button = types.InlineKeyboardButton("👟 Категории", callback_data='category')
+    fav_button = types.InlineKeyboardButton("❤️ Открыть избранное",
+                                             web_app=types.WebAppInfo(url="https://sneakers-5c581.firebaseapp.com/favorites"))
+    menu_button = types.InlineKeyboardButton("📖 Открыть встроенный магазин  ", web_app=types.WebAppInfo(
+        url="https://sneakers-5c581.firebaseapp.com"))
+    markup.add(category_button)
+    markup.add(fav_button)
+    markup.add(menu_button)
+
+    bot.send_message(chat_id, "Выберите опцию:", reply_markup=markup)
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -28,15 +40,9 @@ def start(message):
     photo_url = 'https://shopozz.ru/images/articles/article-1090/p1gt8ijduds7qdu615tql0ig8l3.jpg'
     bot.send_photo(message.chat.id, photo_url, caption="Добро пожаловать в мир оригинальных кроссовок!")
 
-    # Создание инлайн-меню с кнопками
-    markup = types.InlineKeyboardMarkup()
-    category_button = types.InlineKeyboardButton("Категории", callback_data='category')
-    menu_button = types.InlineKeyboardButton("Смотреть удобный каталог", web_app=types.WebAppInfo(url="https://sneakers-5c581.firebaseapp.com/"))
-    fav_button = types.InlineKeyboardButton("Открыть избранное", web_app=types.WebAppInfo(url="https://sneakers-5c581.firebaseapp.com/favorites"))
-    markup.add(category_button)
-    markup.add(fav_button)
-    markup.add(menu_button)
-    bot.send_message(message.chat.id, "Никуда переходить не нужно, выбирай и оплачивай прямо здесь", reply_markup=markup)
+    # Отображаем стартовое меню
+    show_start_menu(message.chat.id)
+
 @bot.callback_query_handler(func=lambda call: call.data == 'category')
 def handle_category(call):
     show_available_categories_inline(call.message)
@@ -139,8 +145,9 @@ def callback_query(call):
         send_full_product_info(call.message.chat.id, index)
 
         # Создаем клавиатуру для выбора размера
+        back_button = types.KeyboardButton("Начать сначала")
         size_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-
+        size_keyboard.add(back_button)
         # Разбиваем размеры на пары и добавляем кнопки
         sizes = details.get('sizes', {})
         for us_size, eu_size in zip(sizes.get('US', []), sizes.get('EU', [])):
@@ -162,13 +169,16 @@ def send_full_product_info(chat_id, index):
         bot.send_message(chat_id, full_info_text)
 
 def choose_payment_method(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn2 = types.KeyboardButton('Наличные')
-    btn3 = types.KeyboardButton('Wallet Pay')
-    markup.row(btn2, btn3)
+    if message.text == 'Начать сначала':
+        show_start_menu(message.chat.id)  # Отображение стартового меню
+    else:
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn2 = types.KeyboardButton('Наличные')
+        btn3 = types.KeyboardButton('Wallet Pay')
+        markup.row(btn2, btn3)
 
-    bot.send_message(message.chat.id, 'Выберите способ оплаты:', reply_markup=markup)
-    bot.register_next_step_handler(message, choose_delivery_method)
+        bot.send_message(message.chat.id, 'Выберите способ оплаты:', reply_markup=markup)
+        bot.register_next_step_handler(message, choose_delivery_method)
 
 def choose_delivery_method(message):
     if message.text == 'Наличные':

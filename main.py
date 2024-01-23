@@ -13,35 +13,109 @@ firebase_admin.initialize_app(cred, {
 
 # Получение ссылки на базу данных, особенно на узел 'items'
 ref = db.reference('items')
+ref = db.reference('')
 
 # Создаем словарь для хранения временных данных пользователей
 user_data = {}
 
 bot = telebot.TeleBot('6662518155:AAHlwCxFLsS-uXWmEq3XByDj9nRSFF40Wdg')
-def show_start_menu(chat_id):
+
+
+def show_start_menu(chat_id, user_id, username):
     markup = types.InlineKeyboardMarkup()
     category_button = types.InlineKeyboardButton("👟 Категории", callback_data='category')
-    fav_button = types.InlineKeyboardButton("❤️ Открыть избранное",
-                                             web_app=types.WebAppInfo(url="https://sneakers-5c581.firebaseapp.com/favorites"))
-    menu_button = types.InlineKeyboardButton("📖 Открыть встроенный магазин  ", web_app=types.WebAppInfo(
-        url="https://sneakers-5c581.firebaseapp.com"))
+
+    # Добавляем user_id и username в URL для "Избранного" и "Встроенного магазина"
+    fav_url = f"https://sneakers-5c581.firebaseapp.com/favorites?user_id={user_id}&username={username}"
+    shop_url = f"https://sneakers-5c581.firebaseapp.com?user_id={user_id}&username={username}"
+
+    fav_button = types.InlineKeyboardButton("❤️ Открыть избранное", web_app=types.WebAppInfo(url=fav_url))
+    menu_button = types.InlineKeyboardButton("📖 Открыть встроенный магазин", web_app=types.WebAppInfo(url=shop_url))
+
     markup.add(category_button)
     markup.add(fav_button)
     markup.add(menu_button)
 
-    bot.send_message(chat_id, "Выберите опцию:", reply_markup=markup)
+    bot.send_message(chat_id, f"Добро пожаловать в мир оригинальных кроссовок, {username}! Выберите опцию:",
+                     reply_markup=markup)
+
 
 @bot.message_handler(commands=['start'])
 def start(message):
     # Сбросим временные данные пользователя при каждом запуске команды /start
     user_data[message.chat.id] = {}
 
-    # Отправляем фото
-    photo_url = 'https://shopozz.ru/images/articles/article-1090/p1gt8ijduds7qdu615tql0ig8l3.jpg'
-    bot.send_photo(message.chat.id, photo_url, caption="Добро пожаловать в мир оригинальных кроссовок!")
+    # Получаем информацию о пользователе
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+    username = message.from_user.username
 
-    # Отображаем стартовое меню
-    show_start_menu(message.chat.id)
+    # Сохраняем данные пользователя
+    user_data[message.chat.id] = {
+        "id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "username": username
+    }
+
+    # Выводим информацию о пользователе в консоль
+    print(f"User ID: {user_id}")
+    print(f"First Name: {first_name}")
+    print(f"Last Name: {last_name}")
+    print(f"Username: {username}")
+
+    # Обновленный вызов функции с передачей username
+
+    bot_ref = ref.child('bot').child(str(user_id))
+    bot_ref.set({
+        "id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "username": username
+    })
+
+    # Отправляем фото с приветственным сообщением
+    photo_url = 'https://shopozz.ru/images/articles/article-1090/p1gt8ijduds7qdu615tql0ig8l3.jpg'
+    bot.send_photo(message.chat.id, photo_url)
+    show_start_menu(message.chat.id, user_id, username)
+
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    # Сбросим временные данные пользователя при каждом запуске команды /start
+    user_data[message.chat.id] = {}
+
+    # Получаем информацию о пользователе
+    user_id = message.from_user.id
+    show_start_menu(message.chat.id, user_id)
+
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+    username = message.from_user.username
+
+    # Сохраняем данные пользователя
+    user_data[message.chat.id] = {
+        "id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "username": username
+    }
+
+    # Выводим информацию о пользователе в консоль
+    print(f"User ID: {user_id}")
+    print(f"First Name: {first_name}")
+    print(f"Last Name: {last_name}")
+    print(f"Username: {username}")
+    bot_ref = ref.child('bot').child(str(user_id))
+    bot_ref.set({
+        "id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "username": username
+    })
+
+
 
 @bot.callback_query_handler(func=lambda call: call.data == 'category')
 def handle_category(call):
@@ -52,26 +126,21 @@ def handle_category(call):
 #         bot.send_message(message.chat.id, "Написать нам: @kamranezi")
 #     elif message.text == "Позвоните нам":
 #         bot.send_message(message.chat.id, "Позвоните нам: +79183083345")
-# @bot.callback_query_handler(func=lambda call: call.data.startswith('category_'))
-# def handle_category_selection(call):
-#     category = call.data.split('_')[1]
+
 def show_available_categories_inline(message):
-    # Получите уникальные категории из базы данных Firebase
     categories_set = set()
-    catalog_data = ref.get()
+    catalog_data = ref.child('items').get()  # Обновленный путь к категориям
 
     if catalog_data:
         for details in catalog_data:
-            if details is not None and 'category' in details and not details.get('available', True):
+            if details is not None and 'category' in details:
                 categories_set.add(details['category'])
 
-    # Создайте инлайн-меню с доступными категориями
     inline_markup = types.InlineKeyboardMarkup(row_width=1)
     for category in categories_set:
         button = types.InlineKeyboardButton(text=category, callback_data=f"category_{category}")
         inline_markup.add(button)
 
-    # Добавляем кнопку "Показать все"
     show_all_button = types.InlineKeyboardButton(text='Показать все', callback_data='show_all')
     inline_markup.add(show_all_button)
 
@@ -89,28 +158,20 @@ def handle_show_all_callback(call):
     show_catalog_inline(call.message)
 
 def show_catalog_inline(message):
-    # Получаем данные из Firebase
-    catalog_data = ref.get()
+    catalog_data = ref.child('items').get()
 
     if catalog_data is None:
-        catalog_data = []  # Если данные отсутствуют, создаем пустой список
+        catalog_data = []
 
-    # Получаем выбранные значения из временных данных пользователя
-    selected_availability = user_data[message.chat.id].get('selected_availability', False)
     selected_category = user_data[message.chat.id].get('selected_category')
 
     for index, details in enumerate(catalog_data):
-        # Добавьте проверки на соответствие категории товара и его наличие
-        if details is None or (selected_availability != details.get('available', False)) or (
-                selected_category and details.get('category') != selected_category):
+        if details is None or (selected_category and details.get('category') != selected_category):
             continue
 
-        # Отправляем карточку товара с фото и инлайн кнопкой
         photo_url = details['image_urls'][0]
 
-        # Проверяем, была ли уже отправлена кнопка "Подробнее" для данного товара
         if index not in user_data[message.chat.id].get('detailed_buttons', []):
-            # Создаем инлайн кнопку с товаром
             item_button = types.InlineKeyboardButton(
                 text=f"{details['title']} - {details['price']} ➡️ Подробнее",
                 callback_data=str(index)
@@ -118,11 +179,9 @@ def show_catalog_inline(message):
             keyboard = types.InlineKeyboardMarkup()
             keyboard.add(item_button)
 
-            # Добавляем маленькое изображение товара под карточкой с кнопками
             bot.send_photo(message.chat.id, photo_url, reply_markup=keyboard)
-
-            # Записываем, что кнопка "Подробнее" уже была отправлена для данного товара
             user_data[message.chat.id].setdefault('detailed_buttons', []).append(index)
+
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -132,7 +191,7 @@ def callback_query(call):
     user_data[call.message.chat.id]['selected_item'] = index
 
     # Отправляем фотографии товара с описанием
-    details = ref.child(str(index)).get()
+    details = ref.child('items').child(str(index)).get()
 
     if details is not None:
         photo_urls = details.get('image_urls', [])
@@ -149,16 +208,18 @@ def callback_query(call):
         size_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
         size_keyboard.add(back_button)
         # Разбиваем размеры на пары и добавляем кнопки
-        sizes = details.get('sizes', {})
-        for us_size, eu_size in zip(sizes.get('US', []), sizes.get('EU', [])):
-            size_button = types.KeyboardButton(f"{us_size} / {eu_size}")
+        sizes = details.get('sizes', [])
+        size_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+
+        for size in sizes:
+            size_button = types.KeyboardButton(size)
             size_keyboard.row(size_button)
 
         bot.send_message(call.message.chat.id, text="Выберите размер:", reply_markup=size_keyboard)
         bot.register_next_step_handler(call.message, choose_payment_method)
 
 def send_full_product_info(chat_id, index):
-    details = ref.child(str(index)).get()
+    details = ref.child('items').child(str(index)).get()
 
     if details is not None:
         description = details.get('description', '')

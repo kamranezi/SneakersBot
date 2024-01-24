@@ -19,15 +19,16 @@ ref = db.reference('')
 user_data = {}
 
 bot = telebot.TeleBot('6662518155:AAHlwCxFLsS-uXWmEq3XByDj9nRSFF40Wdg')
+bot_token = '6662518155:AAHlwCxFLsS-uXWmEq3XByDj9nRSFF40Wdg'
 
 
-def show_start_menu(chat_id, user_id, username):
+def show_start_menu(chat_id, user_id, username, photo_url):
     markup = types.InlineKeyboardMarkup()
     category_button = types.InlineKeyboardButton("👟 Категории", callback_data='category')
 
     # Добавляем user_id и username в URL для "Избранного" и "Встроенного магазина"
-    fav_url = f"https://sneakers-5c581.firebaseapp.com/favorites?user_id={user_id}&username={username}"
-    shop_url = f"https://sneakers-5c581.firebaseapp.com?user_id={user_id}&username={username}"
+    fav_url = f"https://sneakers-5c581.firebaseapp.com/favorites?user_id={user_id}&username={username}&photo_url={photo_url}"
+    shop_url = f"https://sneakers-5c581.firebaseapp.com?user_id={user_id}&username={username}&photo_url={photo_url}"
 
     fav_button = types.InlineKeyboardButton("❤️ Открыть избранное", web_app=types.WebAppInfo(url=fav_url))
     menu_button = types.InlineKeyboardButton("📖 Открыть встроенный магазин", web_app=types.WebAppInfo(url=shop_url))
@@ -50,13 +51,22 @@ def start(message):
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
     username = message.from_user.username
+    photos = bot.get_user_profile_photos(user_id)
+    if photos.photos:
+        photo_file_id = photos.photos[0][0].file_id
+        photo_file = bot.get_file(photo_file_id)
+        photo_url = f"https://api.telegram.org/file/bot{bot_token}/{photo_file.file_path}"
+    else:
+        photo_url = None
 
     # Сохраняем данные пользователя
     user_data[message.chat.id] = {
         "id": user_id,
         "first_name": first_name,
         "last_name": last_name,
-        "username": username
+        "username": username,
+        "photo_url": photo_url  # Добавление URL фотографии
+
     }
 
     # Выводим информацию о пользователе в консоль
@@ -64,6 +74,7 @@ def start(message):
     print(f"First Name: {first_name}")
     print(f"Last Name: {last_name}")
     print(f"Username: {username}")
+    print(f"Photo URL: {photo_url}")
 
     # Обновленный вызов функции с передачей username
 
@@ -76,50 +87,16 @@ def start(message):
     })
 
     # Отправляем фото с приветственным сообщением
-    photo_url = 'https://shopozz.ru/images/articles/article-1090/p1gt8ijduds7qdu615tql0ig8l3.jpg'
-    bot.send_photo(message.chat.id, photo_url)
-    show_start_menu(message.chat.id, user_id, username)
-
-
-@bot.message_handler(commands=['start'])
-def start(message):
-    # Сбросим временные данные пользователя при каждом запуске команды /start
-    user_data[message.chat.id] = {}
-
-    # Получаем информацию о пользователе
-    user_id = message.from_user.id
-    show_start_menu(message.chat.id, user_id)
-
-    first_name = message.from_user.first_name
-    last_name = message.from_user.last_name
-    username = message.from_user.username
-
-    # Сохраняем данные пользователя
-    user_data[message.chat.id] = {
-        "id": user_id,
-        "first_name": first_name,
-        "last_name": last_name,
-        "username": username
-    }
-
-    # Выводим информацию о пользователе в консоль
-    print(f"User ID: {user_id}")
-    print(f"First Name: {first_name}")
-    print(f"Last Name: {last_name}")
-    print(f"Username: {username}")
-    bot_ref = ref.child('bot').child(str(user_id))
-    bot_ref.set({
-        "id": user_id,
-        "first_name": first_name,
-        "last_name": last_name,
-        "username": username
-    })
-
+    welcome_photo_url = 'https://shopozz.ru/images/articles/article-1090/p1gt8ijduds7qdu615tql0ig8l3.jpg'
+    bot.send_photo(message.chat.id, welcome_photo_url)
+    show_start_menu(message.chat.id, user_id, username, photo_url)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'category')
 def handle_category(call):
     show_available_categories_inline(call.message)
+
+
 # @bot.message_handler(content_types=['text'])
 # def handle_text(message):
 #     if message.text == "Написать нам":
@@ -146,16 +123,19 @@ def show_available_categories_inline(message):
 
     bot.send_message(message.chat.id, 'Выберите категорию:', reply_markup=inline_markup)
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('category_'))
 def handle_category_callback(call):
     category = call.data.replace('category_', '')
     user_data[call.message.chat.id]['selected_category'] = category
     show_catalog_inline(call.message)
 
+
 @bot.callback_query_handler(func=lambda call: call.data == 'show_all')
 def handle_show_all_callback(call):
     user_data[call.message.chat.id].pop('selected_category', None)
     show_catalog_inline(call.message)
+
 
 def show_catalog_inline(message):
     catalog_data = ref.child('items').get()
@@ -218,6 +198,7 @@ def callback_query(call):
         bot.send_message(call.message.chat.id, text="Выберите размер:", reply_markup=size_keyboard)
         bot.register_next_step_handler(call.message, choose_payment_method)
 
+
 def send_full_product_info(chat_id, index):
     details = ref.child('items').child(str(index)).get()
 
@@ -228,6 +209,7 @@ def send_full_product_info(chat_id, index):
         full_info_text = f"{details.get('title', '')}\n{description}\n\nЦена: {price}"
 
         bot.send_message(chat_id, full_info_text)
+
 
 def choose_payment_method(message):
     if message.text == 'Начать сначала':
@@ -240,6 +222,7 @@ def choose_payment_method(message):
 
         bot.send_message(message.chat.id, 'Выберите способ оплаты:', reply_markup=markup)
         bot.register_next_step_handler(message, choose_delivery_method)
+
 
 def choose_delivery_method(message):
     if message.text == 'Наличные':
@@ -256,9 +239,11 @@ def choose_delivery_method(message):
         # Здесь можно добавить обработку для других методов оплаты
         pass
 
+
 def process_wallet_payment(message):
     # Добавьте здесь логику обработки оплаты через Wallet Pay
     bot.send_message(message.chat.id, 'Оплата через Wallet Pay успешно завершена!')
+
 
 def handle_delivery_choice(message):
     if message.text == 'Самовывоз':
@@ -269,6 +254,7 @@ def handle_delivery_choice(message):
     elif message.text == 'Доставка':
         # Здесь можно добавить обработку для доставки
         pass
+
 
 # Запуск бота
 bot.polling(none_stop=True)
